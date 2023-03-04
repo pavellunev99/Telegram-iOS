@@ -14,6 +14,7 @@ import PhotoResources
 import CallsEmoji
 
 final class LegacyCallControllerNode: ASDisplayNode, CallControllerNodeProtocol {
+
     private let sharedContext: SharedAccountContext
     private let account: Account
     
@@ -34,7 +35,7 @@ final class LegacyCallControllerNode: ASDisplayNode, CallControllerNodeProtocol 
     private let backButtonNode: HighlightableButtonNode
     private let statusNode: LegacyCallControllerStatusNode
     private let buttonsNode: LegacyCallControllerButtonsNode
-    private var keyPreviewNode: CallControllerKeyPreviewNode?
+    private var keyPreviewNode: LegacyCallControllerKeyPreviewNode?
     
     private var debugNode: CallDebugNode?
     
@@ -66,6 +67,7 @@ final class LegacyCallControllerNode: ASDisplayNode, CallControllerNodeProtocol 
     var dismissedInteractively: (() -> Void)?
     var present: ((ViewController) -> Void)?
     var dismissAllTooltips: (() -> Void)?
+    var rateCall: ((Int) -> Void)?
     
     init(sharedContext: SharedAccountContext, account: Account, presentationData: PresentationData, statusBar: StatusBar, debugInfo: Signal<(String, String), NoError>, shouldStayHiddenUntilConnection: Bool = false, easyDebugAccess: Bool, call: PresentationCall) {
         self.sharedContext = sharedContext
@@ -198,6 +200,9 @@ final class LegacyCallControllerNode: ASDisplayNode, CallControllerNodeProtocol 
             self.audioOutputState = (availableOutputs, currentOutput)
             self.updateButtonsMode()
         }
+    }
+
+    func updateVoiceLevel(_ level: Float) {
     }
     
     func updateCallState(_ callState: PresentationCallState) {
@@ -443,7 +448,7 @@ final class LegacyCallControllerNode: ASDisplayNode, CallControllerNodeProtocol 
     
     @objc func keyPressed() {
         if self.keyPreviewNode == nil, let keyText = self.keyTextData?.1, let peer = self.peer {
-            let keyPreviewNode = CallControllerKeyPreviewNode(keyText: keyText, infoText: self.presentationData.strings.Call_EmojiDescription(EnginePeer(peer).compactDisplayTitle).string.replacingOccurrences(of: "%%", with: "%"), dismiss: { [weak self] in
+            let keyPreviewNode = LegacyCallControllerKeyPreviewNode(keyText: keyText, infoText: self.presentationData.strings.Call_EmojiDescription(EnginePeer(peer).compactDisplayTitle).string.replacingOccurrences(of: "%%", with: "%"), dismiss: { [weak self] in
                 if let _ = self?.keyPreviewNode {
                     self?.backPressed()
                 }

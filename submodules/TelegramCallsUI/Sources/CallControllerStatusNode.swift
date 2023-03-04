@@ -11,13 +11,13 @@ private let compactStatusFont = Font.regular(18.0)
 private let regularStatusFont = Font.regular(18.0)
 
 enum CallControllerStatusValue: Equatable {
-    case text(string: String, displayLogo: Bool)
+    case text(string: String, displayLogo: Bool, isConnecting: Bool)
     case timer((String, Bool) -> String, Double)
     
     static func ==(lhs: CallControllerStatusValue, rhs: CallControllerStatusValue) -> Bool {
         switch lhs {
-            case let .text(text, displayLogo):
-                if case .text(text, displayLogo) = rhs {
+            case let .text(text, displayLogo, _):
+                if case .text(text, displayLogo, _) = rhs {
                     return true
                 } else {
                     return false
@@ -39,13 +39,15 @@ final class CallControllerStatusNode: ASDisplayNode {
     private let statusMeasureNode: TextNode
     private let receptionNode: CallControllerReceptionNode
     private let logoNode: ASImageNode
+    private var connectingNode: CallControllerStatusConnectingNode?
     
     private let titleActivateAreaNode: AccessibilityAreaNode
     private let statusActivateAreaNode: AccessibilityAreaNode
-    
+
+    var isMinimized: Bool = false
     var title: String = ""
     var subtitle: String = ""
-    var status: CallControllerStatusValue = .text(string: "", displayLogo: false) {
+    var status: CallControllerStatusValue = .text(string: "", displayLogo: false, isConnecting: false) {
         didSet {
             if self.status != oldValue {
                 self.statusTimer?.invalidate()
@@ -64,18 +66,30 @@ final class CallControllerStatusNode: ASDisplayNode {
                     self.statusContainerNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.3)
                     self.statusContainerNode.layer.animatePosition(from: CGPoint(x: 0.0, y: -snapshotView.frame.height / 2.0), to: CGPoint(), duration: 0.3, delay: 0.0, additive: true)
                 }
-                                
-                if case .timer = self.status {
+
+
+                switch self.status {
+                case .text(_, _, let isConnecting):
+                    if isConnecting {
+                        if self.connectingNode == nil {
+                            self.connectingNode = CallControllerStatusConnectingNode()
+                            self.statusContainerNode.addSubnode(self.connectingNode!)
+                        }
+                    } else {
+                        self.connectingNode?.removeFromSupernode()
+                    }
+
+                    if let validLayoutWidth = self.validLayoutWidth {
+                        let _ = self.updateLayout(constrainedWidth: validLayoutWidth, transition: .immediate, isMinimized: self.isMinimized)
+                    }
+                case .timer(_, _):
                     self.statusTimer = SwiftSignalKit.Timer(timeout: 0.5, repeat: true, completion: { [weak self] in
                         if let strongSelf = self, let validLayoutWidth = strongSelf.validLayoutWidth {
-                            let _ = strongSelf.updateLayout(constrainedWidth: validLayoutWidth, transition: .immediate)
+                            let _ = strongSelf.updateLayout(constrainedWidth: validLayoutWidth, transition: .immediate, isMinimized: strongSelf.isMinimized)
                         }
                     }, queue: Queue.mainQueue())
                     self.statusTimer?.start()
-                } else {
-                    if let validLayoutWidth = self.validLayoutWidth {
-                        let _ = self.updateLayout(constrainedWidth: validLayoutWidth, transition: .immediate)
-                    }
+                    self.connectingNode?.removeFromSupernode()
                 }
             }
         }
@@ -97,7 +111,7 @@ final class CallControllerStatusNode: ASDisplayNode {
                 
                 if (oldValue == nil) != (self.reception != nil) {
                     if let validLayoutWidth = self.validLayoutWidth {
-                        let _ = self.updateLayout(constrainedWidth: validLayoutWidth, transition: .immediate)
+                        let _ = self.updateLayout(constrainedWidth: validLayoutWidth, transition: .immediate, isMinimized: self.isMinimized)
                     }
                 }
             }
@@ -151,17 +165,24 @@ final class CallControllerStatusNode: ASDisplayNode {
         transition.updateAlpha(node: self.statusContainerNode, alpha: alpha)
     }
     
-    func updateLayout(constrainedWidth: CGFloat, transition: ContainedViewLayoutTransition) -> CGFloat {
+    func updateLayout(constrainedWidth: CGFloat, transition: ContainedViewLayoutTransition, isMinimized: Bool) -> CGFloat {
         self.validLayoutWidth = constrainedWidth
+        self.isMinimized = isMinimized
         
         let nameFont: UIFont
         let statusFont: UIFont
-        if constrainedWidth < 330.0 {
-            nameFont = compactNameFont
-            statusFont = compactStatusFont
+
+        if isMinimized {
+            nameFont = Font.semibold(17)
+            statusFont = Font.regular(16.0)
         } else {
-            nameFont = regularNameFont
-            statusFont = regularStatusFont
+            if constrainedWidth < 330.0 {
+                nameFont = compactNameFont
+                statusFont = compactStatusFont
+            } else {
+                nameFont = regularNameFont
+                statusFont = regularStatusFont
+            }
         }
         
         var statusOffset: CGFloat = 0.0
@@ -169,8 +190,8 @@ final class CallControllerStatusNode: ASDisplayNode {
         let statusMeasureText: String
         var statusDisplayLogo: Bool = false
         switch self.status {
-        case let .text(text, displayLogo):
-            statusText = text
+        case let .text(text, displayLogo, _):
+            statusText = text.replacingOccurrences(of: "...", with: "") // TODO: Replace lokalized strings (remove dots)
             statusMeasureText = text
             statusDisplayLogo = displayLogo
             if displayLogo {
@@ -215,6 +236,16 @@ final class CallControllerStatusNode: ASDisplayNode {
             let firstLineOffset = floor((statusMeasureLayout.size.width - firstLineRect.width) / 2.0)
             self.logoNode.frame = CGRect(origin: CGPoint(x: self.statusNode.frame.minX + firstLineOffset - image.size.width - 7.0, y: 5.0), size: image.size)
         }
+
+        var connectingNodeSize = CGSize()
+
+        if let connectingNode = self.connectingNode {
+            connectingNodeSize = connectingNode.updateLayout(transition: transition)
+            let connectingNodeFrame = CGRect(origin: CGPoint(x: self.statusNode.frame.maxX + 8.5, y: self.statusContainerNode.frame.height/2 - connectingNodeSize.height/2), size: connectingNodeSize)
+            transition.updateFrame(node: connectingNode, frame: connectingNodeFrame)
+        }
+
+        let _ = connectingNodeSize
         
         self.titleActivateAreaNode.frame = self.titleNode.frame
         self.statusActivateAreaNode.frame = self.statusContainerNode.frame
@@ -276,5 +307,63 @@ final class CallControllerReceptionNode : ASDisplayNode {
                 context.fillPath()
             }
         }
+    }
+}
+
+final class CallControllerStatusConnectingNode : ASDisplayNode {
+
+    private let dotNodes: [ASDisplayNode]
+
+    override init() {
+
+        var dotNodes: [ASDisplayNode] = []
+
+        for _ in 0..<3 {
+            let dotNode = ASDisplayNode()
+            dotNodes.append(dotNode)
+        }
+
+        self.dotNodes = dotNodes
+
+        super.init()
+
+        self.dotNodes.forEach {
+            $0.backgroundColor = .white
+            self.addSubnode($0)
+        }
+    }
+
+    func updateLayout(transition: ContainedViewLayoutTransition) -> CGSize {
+
+        let initialSize = CGSize(width: 1, height: 1)
+        let offset = 3.0
+        var index = 0.0
+        let duration = 1.5
+        let dotDuration = duration/CGFloat(dotNodes.count)
+
+        self.dotNodes.forEach {
+            $0.clipsToBounds = true
+            $0.cornerRadius = initialSize.height / 2
+            $0.frame = CGRect(origin: CGPoint(x: (initialSize.width + offset) * index, y: initialSize.height / 2), size: initialSize)
+
+            if $0.layer.animation(forKey: "scale") == nil {
+                $0.layer.add(scaleAnimation(with: (CGFloat(dotNodes.count) - index - 1.0) * dotDuration / 2, duration: dotDuration), forKey: "scale")
+            }
+
+            index += 1
+        }
+
+        return CGSize(width: 15, height: 4)
+    }
+
+    func scaleAnimation(with timeOffset: TimeInterval, duration: TimeInterval) -> CABasicAnimation {
+        let animation = CABasicAnimation(keyPath: "transform.scale")
+        animation.duration = duration
+        animation.autoreverses = true
+        animation.fromValue = 1.0
+        animation.toValue = 3.0
+        animation.timeOffset = timeOffset
+        animation.repeatCount = .infinity
+        return animation
     }
 }

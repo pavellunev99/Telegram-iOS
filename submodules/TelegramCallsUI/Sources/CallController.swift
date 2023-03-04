@@ -23,15 +23,17 @@ protocol CallControllerNodeProtocol: AnyObject {
     var acceptCall: (() -> Void)? { get set }
     var endCall: (() -> Void)? { get set }
     var back: (() -> Void)? { get set }
-    var presentCallRating: ((CallId, Bool) -> Void)? { get set }
+    // var presentCallRating: ((CallId, Bool) -> Void)? { get set } legacy controller
     var present: ((ViewController) -> Void)? { get set }
     var callEnded: ((Bool) -> Void)? { get set }
     var dismissedInteractively: (() -> Void)? { get set }
     var dismissAllTooltips: (() -> Void)? { get set }
+    var rateCall: ((Int) -> Void)? { get set }
     
     func updateAudioOutputs(availableOutputs: [AudioSessionOutput], currentOutput: AudioSessionOutput?)
     func updateCallState(_ callState: PresentationCallState)
     func updatePeer(accountPeer: Peer, peer: Peer, hasOther: Bool)
+    func updateVoiceLevel(_ level: Float)
     
     func animateIn()
     func animateOut(completion: @escaping () -> Void)
@@ -72,6 +74,12 @@ public final class CallController: ViewController {
     private var audioOutputState: ([AudioSessionOutput], AudioSessionOutput?)?
     
     private let idleTimerExtensionDisposable = MetaDisposable()
+    private var voiceLevelDisposable: Disposable?
+
+    private var dismissTimer: DispatchSourceTimer?
+    private var isRateShowed = false
+    private var dismissHandler: (() -> Void)?
+    private var callId: CallId?
     
     public init(sharedContext: SharedAccountContext, account: Account, call: PresentationCall, easyDebugAccess: Bool) {
         self.sharedContext = sharedContext
@@ -114,6 +122,13 @@ public final class CallController: ViewController {
                 }
             }
         })
+
+        self.voiceLevelDisposable = (call.audioLevel
+        |> deliverOnMainQueue).start(next: { [weak self] level in
+            if let strongSelf = self {
+                strongSelf.controllerNode.updateVoiceLevel(level)
+            }
+        })
     }
     
     required public init(coder aDecoder: NSCoder) {
@@ -130,6 +145,30 @@ public final class CallController: ViewController {
     
     private func callStateUpdated(_ callState: PresentationCallState) {
         if self.isNodeLoaded {
+            switch callState.state {
+            case let .terminated(callId, _, reportRating):
+                self.callId = callId
+                self.isRateShowed = reportRating || true
+                if self.isRateShowed, self.dismissTimer == nil {
+                    self.dismissTimer = DispatchSource.makeTimerSource()
+                    self.dismissTimer?.setEventHandler(handler: { [weak self] in
+                        if let strongSelf = self {
+                            strongSelf.isRateShowed = false
+                            strongSelf.dismissTimer?.cancel()
+                            strongSelf.dismissTimer = nil
+
+                            DispatchQueue.main.async {
+                                strongSelf.dismiss(completion: strongSelf.dismissHandler)
+                            }
+                        }
+                    })
+                    self.dismissTimer?.schedule(deadline: .now() + 5)
+                    self.dismissTimer?.activate()
+                }
+            default:
+                break
+            }
+
             self.controllerNode.updateCallState(callState)
         }
     }
@@ -230,27 +269,47 @@ public final class CallController: ViewController {
         self.controllerNode.back = { [weak self] in
             let _ = self?.dismiss()
         }
-        
-        self.controllerNode.presentCallRating = { [weak self] callId, isVideo in
-            if let strongSelf = self, !strongSelf.presentedCallRating {
-                strongSelf.presentedCallRating = true
-                
-                Queue.mainQueue().after(0.5, {
-                    let window = strongSelf.window
-                    let controller = callRatingController(sharedContext: strongSelf.sharedContext, account: strongSelf.account, callId: callId, userInitiated: false, isVideo: isVideo, present: { c, a in
-                        if let window = window {
-                            c.presentationArguments = a
-                            window.present(c, on: .root, blockInteraction: false, completion: {})
-                        }
-                    }, push: { [weak self] c in
-                        if let strongSelf = self {
-                            strongSelf.push(c)
-                        }
-                    })
-                    strongSelf.present(controller, in: .window(.root))
-                })
+
+        self.controllerNode.rateCall = { [weak self] rating in
+            if let strongSelf = self, let callId = strongSelf.callId {
+                if rating < 4, let window = strongSelf.window {
+                    let controller = callFeedbackController(sharedContext: strongSelf.sharedContext, account: strongSelf.account, callId: callId, rating: rating, userInitiated: true, isVideo: strongSelf.call.isVideo)
+                    window.present(controller, on: .calls, blockInteraction: false, completion: {})
+                } else {
+                    let _ = rateCallAndSendLogs(engine: TelegramEngine(account: strongSelf.account), callId: callId, starsCount: rating, comment: "", userInitiated: true, includeLogs: false).start()
+                }
+
+                strongSelf.isRateShowed = false
+                strongSelf.dismissTimer?.cancel()
+                strongSelf.dismissTimer = nil
+                strongSelf.dismiss(completion: strongSelf.dismissHandler)
             }
         }
+        
+//        self.controllerNode.presentCallRating = { [weak self] callId, isVideo in
+//            if let strongSelf = self, !strongSelf.presentedCallRating {
+//                strongSelf.presentedCallRating = true
+//
+//                strongSelf.controllerNode.rateCall {
+//                    strongSelf.dismiss()
+//                }
+//
+//                Queue.mainQueue().after(0.5, {
+//                    let window = strongSelf.window
+//                    let controller = callRatingController(sharedContext: strongSelf.sharedContext, account: strongSelf.account, callId: callId, userInitiated: false, isVideo: isVideo, present: { c, a in
+//                        if let window = window {
+//                            c.presentationArguments = a
+//                            window.present(c, on: .root, blockInteraction: false, completion: {})
+//                        }
+//                    }, push: { [weak self] c in
+//                        if let strongSelf = self {
+//                            strongSelf.push(c)
+//                        }
+//                    })
+//                    strongSelf.present(controller, in: .window(.root))
+//                })
+//            }
+//        }
         
         self.controllerNode.present = { [weak self] controller in
             if let strongSelf = self {
@@ -300,6 +359,7 @@ public final class CallController: ViewController {
         
         self.controllerNode.dismissedInteractively = { [weak self] in
             self?.didPlayPresentationAnimation = false
+            self?.dismissHandler?()
             self?.presentingViewController?.dismiss(animated: false, completion: nil)
         }
         
@@ -346,6 +406,13 @@ public final class CallController: ViewController {
     }
     
     override public func dismiss(completion: (() -> Void)? = nil) {
+
+        self.dismissHandler = completion
+
+        if self.isRateShowed {
+            return
+        }
+
         self.controllerNode.animateOut(completion: { [weak self] in
             self?.didPlayPresentationAnimation = false
             self?.presentingViewController?.dismiss(animated: false, completion: nil)
