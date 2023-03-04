@@ -120,9 +120,13 @@ final class CallControllerButtonsNode: ASDisplayNode {
     
     func updateLayout(strings: PresentationStrings, mode: CallControllerButtonsMode, constrainedWidth: CGFloat, bottomInset: CGFloat, transition: ContainedViewLayoutTransition) -> CGFloat {
         self.validLayout = (constrainedWidth, bottomInset)
+
+        if case .close = mode, case .close = self.mode {
+            return 56.0 + max(bottomInset + 19.0, 46.0)
+        }
         
         self.mode = mode
-        
+
         if let mode = self.mode {
             return self.updateButtonsLayout(strings: strings, mode: mode, width: constrainedWidth, bottomInset: bottomInset, animated: transition.isAnimated)
         } else {

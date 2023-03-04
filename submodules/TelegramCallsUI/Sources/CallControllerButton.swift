@@ -159,26 +159,19 @@ final class CallControllerButtonItemNode: HighlightTrackingButtonNode {
             fillLayer.fillColor = UIColor.white.cgColor
             fillLayer.cornerRadius = 14
             fillLayer.masksToBounds = true
-            self.contentNode.layer.insertSublayer(fillLayer, below: self.textNode.layer)
+            self.contentNode.layer.insertSublayer(fillLayer, below: self.titleNode.layer)
 
             transition.animateTransformScale(layer: contentNode.layer, from: CGPoint(x: 0.2, y: 1), to: CGPoint(x: 1.0, y: 1.0))
 
-            let textFrame = CGRect(origin: CGPoint(x: 0, y: size.height/2 - 11.0), size: CGSize(width: size.width, height: 22.0))
             let textColor = UIColor(red: 0.67, green: 0.40, blue: 0.83, alpha: 1.00)
+            self.titleNode.attributedText = NSAttributedString(string: text, font: Font.semibold(17), textColor: textColor)
 
-            self.textNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: size.width, height: 22.0))
-            self.textNode.attributedText = NSAttributedString(string: text, font: Font.semibold(17), textColor: textColor)
-            self.textNode.textAlignment = .center
-            let _ = self.textNode.updateLayout(size)
+//            let textFrame = CGRect(origin: CGPoint(x: 0, y: size.height/2 - 11.0), size: CGSize(width: size.width, height: 22.0))
 
-            let gradientLayer = CAGradientLayer()
-            gradientLayer.startPoint = CGPoint(x: 0.0, y: 0.5)
-            gradientLayer.endPoint = CGPoint(x: 1.0, y: 0.5)
-            gradientLayer.colors = [UIColor.white.cgColor, textColor.cgColor]
-            gradientLayer.locations = [0.0, 0.0] as [NSNumber]
-            gradientLayer.frame = textFrame
-
-            self.textNode.layer.mask = gradientLayer
+//            self.textNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: size.width, height: 22.0))
+//            self.textNode.attributedText =
+//            self.textNode.textAlignment = .center
+//            let _ = self.textNode.updateLayout(size)
 
             self.currentText = text
 
@@ -191,15 +184,6 @@ final class CallControllerButtonItemNode: HighlightTrackingButtonNode {
                 fillAnimation.fromValue = path
                 fillAnimation.toValue = fillFinishPath
                 fillAnimation.isRemovedOnCompletion = false
-
-                let maskAnimation = CABasicAnimation(keyPath: "locations")
-                maskAnimation.duration = duration
-                maskAnimation.fromValue = [0.0, 0.0]
-                maskAnimation.toValue = [1.0, 1.0]
-                maskAnimation.fillMode = .forwards
-                maskAnimation.isRemovedOnCompletion = false
-
-                gradientLayer.add(maskAnimation, forKey: "fillAnimation")
 
                 fillLayer.add(fillAnimation, forKey: "fillAnimation")
                 fillLayer.path = fillFinishPath
