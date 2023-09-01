@@ -2488,7 +2488,7 @@ final class ChatListControllerNode: ASDisplayNode, UIGestureRecognizerDelegate {
                                 self.allowOverscrollItemExpansion = false
                                 
                                 if isPrimary {
-                                    self.mainContainerNode.currentItemNode.revealScrollHiddenItem()
+                                    //self.mainContainerNode.currentItemNode.revealScrollHiddenItem()
                                 } else {
                                     self.inlineStackContainerNode?.currentItemNode.revealScrollHiddenItem()
                                 }
@@ -2541,6 +2541,10 @@ final class ChatListControllerNode: ASDisplayNode, UIGestureRecognizerDelegate {
         if isPrimary {
             self.allowOverscrollStoryExpansion = false
             self.currentOverscrollStoryExpansionTimestamp = nil
+            
+            if let chatListNode = listView as? ChatListNode {
+                chatListNode.endedInteractiveDragging()
+            }
         }
         self.allowOverscrollItemExpansion = false
         self.currentOverscrollItemExpansionTimestamp = nil

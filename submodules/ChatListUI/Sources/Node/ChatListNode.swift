@@ -1232,6 +1232,8 @@ public final class ChatListNode: ListView {
     }
     
     public var startedScrollingAtUpperBound: Bool = false
+    public var overscrolledToReveal: Bool = false
+    public var reveailing: Bool = false
     
     private let autoSetReady: Bool
     
@@ -2198,7 +2200,7 @@ public final class ChatListNode: ListView {
             let previousView = previousView.swap(processedView)
             let previousState = previousState.swap(state)
             
-            let reason: ChatListNodeViewTransitionReason
+            var reason: ChatListNodeViewTransitionReason
             var prepareOnMainQueue = false
             
             var previousWasEmptyOrSingleHole = false
@@ -2289,7 +2291,6 @@ public final class ChatListNode: ListView {
                     }
                 }
                 var doesIncludeRemovingPeerId = false
-                var doesIncludeArchive = false
                 var doesIncludeHiddenByDefaultArchive = false
                 var doesIncludeNotice = false
                 
@@ -2318,7 +2319,6 @@ public final class ChatListNode: ListView {
                             }
                         }
                     } else if case let .GroupReferenceEntry(groupReferenceEntry) = entry {
-                        doesIncludeArchive = true
                         doesIncludeHiddenByDefaultArchive = groupReferenceEntry.hiddenByDefault
                     } else if case .Notice = entry {
                         doesIncludeNotice = true
@@ -2334,9 +2334,6 @@ public final class ChatListNode: ListView {
                     disableAnimations = false
                 }
                 if doesIncludeRemovingPeerId != didIncludeRemovingPeerId {
-                    disableAnimations = false
-                }
-                if hideArchivedFolderByDefault && previousState.hiddenItemShouldBeTemporaryRevealed != state.hiddenItemShouldBeTemporaryRevealed && doesIncludeArchive {
                     disableAnimations = false
                 }
                 if didIncludeHiddenByDefaultArchive != doesIncludeHiddenByDefaultArchive {
@@ -2860,6 +2857,12 @@ public final class ChatListNode: ListView {
             if revealHiddenItems && !strongSelf.currentState.hiddenItemShouldBeTemporaryRevealed {
                 //strongSelf.revealScrollHiddenItem()
             }
+            
+            if strongSelf.startedScrollingAtUpperBound, startedScrollingWithCanExpandHiddenItems {
+                if case let .known(value) = strongSelf.visibleContentOffset() {
+                    strongSelf.expandHiddenItemOffsetChanged(offset: value)
+                }
+            }
         }
         
         self.pollFilterUpdates()
@@ -2911,6 +2914,71 @@ public final class ChatListNode: ListView {
         })
         
         return isHiddenItemVisible
+    }
+    
+    func endedInteractiveDragging() {
+        guard self.overscrolledToReveal else {
+            return
+        }
+        
+        let group = DispatchGroup()
+        
+        self.reveailing = true
+        self.forEachItemNode({ itemNode in
+            if let itemNode = itemNode as? ChatListItemNode, let item = itemNode.item {
+                
+                group.enter()
+                itemNode.animateTransitionOffsetToRevealArchive {
+                    group.leave()
+                }
+                if case .groupReference = item.content {
+                    group.enter()
+                    itemNode.revealScrollHiddenItem { [weak self] in
+                        guard let strongSelf = self else {
+                            return
+                        }
+                        strongSelf.reveailing = false
+                        group.leave()
+                    }
+                }
+            }
+        })
+        
+        group.notify(queue: .main) {
+//            self.forEachItemNode({ itemNode in
+//                if let itemNode = itemNode as? ChatListItemNode {
+//                    itemNode.transitionOffset = 0
+//                }
+//            })
+            self.revealScrollHiddenItem()
+        }
+    }
+    
+    func expandHiddenItemOffsetChanged(offset: CGFloat) {
+        guard self.hasItemsToBeRevealed() else {
+            self.overscrolledToReveal = false
+            return
+        }
+        
+        guard self.reveailing == false else {
+            return
+        }
+        
+        guard offset < 0.001 else {
+            self.overscrolledToReveal = false
+            return
+        }
+        
+        self.overscrolledToReveal = offset <= -76
+        
+        self.forEachItemNode({ itemNode in
+            if let itemNode = itemNode as? ChatListItemNode, let item = itemNode.item {
+                itemNode.transitionOffset = offset
+                if case .groupReference(_) = item.content {
+                    itemNode.archiveRevealOffsetChanged(offset: -offset, canReveal: self.overscrolledToReveal)
+                }
+            }
+        })
     }
     
     func revealScrollHiddenItem() {

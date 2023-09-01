@@ -693,7 +693,7 @@ func chatListNodeEntriesForView(view: EngineChatList, state: ChatListNodeState, 
             autoremoveTimeout: entry.autoremoveTimeout,
             forumTopicData: entry.forumTopicData,
             topForumTopicItems: entry.topForumTopicItems,
-            revealed: threadId == 1 && (state.hiddenItemShouldBeTemporaryRevealed || state.editing),
+            revealed: state.hiddenItemShouldBeTemporaryRevealed || state.editing,
             storyState: entry.renderedPeer.peerId == accountPeerId ? nil : entry.storyStats.flatMap { stats -> ChatListNodeState.StoryState in
                 return ChatListNodeState.StoryState(
                     stats: stats,
@@ -748,7 +748,7 @@ func chatListNodeEntriesForView(view: EngineChatList, state: ChatListNodeState, 
                         autoremoveTimeout: nil,
                         forumTopicData: nil,
                         topForumTopicItems: [],
-                        revealed: false,
+                        revealed: state.hiddenItemShouldBeTemporaryRevealed,
                         storyState: nil
                     )))
                     if foundPinningIndex != 0 {
@@ -779,7 +779,7 @@ func chatListNodeEntriesForView(view: EngineChatList, state: ChatListNodeState, 
                 autoremoveTimeout: nil,
                 forumTopicData: nil,
                 topForumTopicItems: [],
-                revealed: false,
+                revealed: state.hiddenItemShouldBeTemporaryRevealed,
                 storyState: nil
             )))
         } else {

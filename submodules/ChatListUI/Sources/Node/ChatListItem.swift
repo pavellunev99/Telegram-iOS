@@ -26,6 +26,7 @@ import TextNodeWithEntities
 import ComponentFlow
 import EmojiStatusComponent
 import AvatarVideoNode
+import AnimationUI
 
 public enum ChatListItemContent {
     public struct ThreadInfo: Equatable {
@@ -970,6 +971,7 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
     var credibilityIconView: ComponentHostView<Empty>?
     var credibilityIconComponent: EmojiStatusComponent?
     let mutedIconNode: ASImageNode
+    var archiveRevealNode: ChatListArchiveRevealNode?
     
     private var hierarchyTrackingLayer: HierarchyTrackingLayer?
     private var cachedDataDisposable = MetaDisposable()
@@ -2692,11 +2694,12 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
             let rawContentRect = CGRect(origin: CGPoint(x: 2.0, y: layoutOffset + floor(item.presentationData.fontSize.itemListBaseFontSize * 8.0 / 17.0)), size: CGSize(width: rawContentWidth, height: itemHeight - 12.0 - 9.0))
             
             let insets = ChatListItemNode.insets(first: first, last: last, firstWithHeader: firstWithHeader)
-            var heightOffset: CGFloat = 0.0
-            if item.hiddenOffset {
-                heightOffset = -itemHeight
+            
+            var layoutHeight = itemHeight
+            if case .groupReference = item.content {
+                layoutHeight = item.hiddenOffset ? 0 : itemHeight
             }
-            let layout = ListViewItemNodeLayout(contentSize: CGSize(width: params.width, height: max(0.0, itemHeight + heightOffset)), insets: insets)
+            let layout = ListViewItemNodeLayout(contentSize: CGSize(width: params.width, height: layoutHeight), insets: insets)
             
             var customActions: [ChatListItemAccessibilityCustomAction] = []
             for option in peerLeftRevealOptions {
@@ -2720,13 +2723,14 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
                         animateOnline = false
                     }
                     strongSelf.currentOnline = online
+                    strongSelf.transitionOffset = 0
                     
                     if item.hiddenOffset {
                         strongSelf.layer.zPosition = -1.0
                     }
                                        
                     if case .groupReference = item.content {
-                        strongSelf.layer.sublayerTransform = CATransform3DMakeTranslation(0.0, layout.contentSize.height - itemHeight, 0.0)
+                        strongSelf.layer.sublayerTransform = CATransform3DMakeTranslation(0.0, item.hiddenOffset ? -itemHeight : 0, 0.0)
                     }
                     
                     if let _ = updatedTheme {
@@ -2752,7 +2756,7 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
                     var mainContentAlpha: CGFloat = 1.0
                     
                     if useChatListLayout {
-                        mainContentFrame = CGRect(origin: CGPoint(x: leftInset - 2.0, y: 0.0), size: CGSize(width: layout.contentSize.width, height: layout.contentSize.height))
+                        mainContentFrame = CGRect(origin: CGPoint(x: leftInset - 2.0, y: 0.0), size: CGSize(width: layout.contentSize.width, height: itemHeight))
                         mainContentBoundsOffset = mainContentFrame.origin.x
                         
                         if let inlineNavigationLocation = item.interaction.inlineNavigationLocation {
@@ -2760,7 +2764,7 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
                             mainContentBoundsOffset += (mainContentFrame.width - mainContentFrame.minX) * inlineNavigationLocation.progress
                         }
                     } else {
-                        mainContentFrame = CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: CGSize(width: layout.contentSize.width, height: layout.contentSize.height))
+                        mainContentFrame = CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: CGSize(width: layout.contentSize.width, height: itemHeight))
                         mainContentBoundsOffset = 0.0
                     }
                     
@@ -2771,7 +2775,7 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
                     
                     var crossfadeContent = false
                     if let selectableControlSizeAndApply = selectableControlSizeAndApply {
-                        let selectableControlSize = CGSize(width: selectableControlSizeAndApply.0, height: layout.contentSize.height)
+                        let selectableControlSize = CGSize(width: selectableControlSizeAndApply.0, height: itemHeight)
                         let selectableControlFrame = CGRect(origin: CGPoint(x: params.leftInset + revealOffset, y: layoutOffset), size: selectableControlSize)
                         if strongSelf.selectableControlNode == nil {
                             crossfadeContent = true
@@ -2799,9 +2803,9 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
                     
                     var animateBadges = animateContent
                     if let reorderControlSizeAndApply = reorderControlSizeAndApply {
-                        let reorderControlFrame = CGRect(origin: CGPoint(x: params.width + revealOffset - params.rightInset - reorderControlSizeAndApply.0, y: layoutOffset), size: CGSize(width: reorderControlSizeAndApply.0, height: layout.contentSize.height))
+                        let reorderControlFrame = CGRect(origin: CGPoint(x: params.width + revealOffset - params.rightInset - reorderControlSizeAndApply.0, y: layoutOffset), size: CGSize(width: reorderControlSizeAndApply.0, height: itemHeight))
                         if strongSelf.reorderControlNode == nil {
-                            let reorderControlNode = reorderControlSizeAndApply.1(layout.contentSize.height, false, .immediate)
+                            let reorderControlNode = reorderControlSizeAndApply.1(itemHeight, false, .immediate)
                             strongSelf.reorderControlNode = reorderControlNode
                             strongSelf.addSubnode(reorderControlNode)
                             reorderControlNode.frame = reorderControlFrame
@@ -2817,7 +2821,7 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
                             transition.updateAlpha(node: strongSelf.pinnedIconNode, alpha: 0.0)
                             transition.updateAlpha(node: strongSelf.statusNode, alpha: 0.0)
                         } else if let reorderControlNode = strongSelf.reorderControlNode {
-                            let _ = reorderControlSizeAndApply.1(layout.contentSize.height, false, .immediate)
+                            let _ = reorderControlSizeAndApply.1(itemHeight, false, .immediate)
                             transition.updateFrame(node: reorderControlNode, frame: reorderControlFrame)
                         }
                     } else if let reorderControlNode = strongSelf.reorderControlNode {
@@ -3574,7 +3578,7 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
                     
                     strongSelf.highlightedBackgroundNode.backgroundColor = highlightedBackgroundColor
                     let topNegativeInset: CGFloat = 0.0
-                    strongSelf.highlightedBackgroundNode.frame = CGRect(origin: CGPoint(x: 0.0, y: layoutOffset - separatorHeight - topNegativeInset), size: CGSize(width: layout.contentSize.width, height: layout.contentSize.height + separatorHeight + topNegativeInset))
+                    strongSelf.highlightedBackgroundNode.frame = CGRect(origin: CGPoint(x: 0.0, y: layoutOffset - separatorHeight - topNegativeInset), size: CGSize(width: layout.contentSize.width, height: itemHeight + separatorHeight + topNegativeInset))
                     
                     if let peerPresence = peerPresence {
                         strongSelf.peerPresenceManager?.reset(presence: EnginePeer.Presence(status: peerPresence.status, lastActivity: 0), isOnline: online)
@@ -3603,8 +3607,51 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
                     }
                     
                     strongSelf.avatarTapRecognizer?.isEnabled = item.interaction.inlineNavigationLocation == nil
+                    
+                    if case .groupReference(_) = item.content, strongSelf.archiveRevealNode == nil, item.hiddenOffset {
+                        let _archiveRevealNode = ChatListArchiveRevealNode()
+                        strongSelf.contextContainer.addSubnode(_archiveRevealNode)
+                        transition.updateFrame(node: _archiveRevealNode, frame: contextContainerFrame)
+                        strongSelf.archiveRevealNode = _archiveRevealNode
+                        _archiveRevealNode.asyncLayout(with: contextContainerFrame.size, avatarRect: avatarFrame, scrollOffset: 0, canReveal: false)
+                    }
                 }
             })
+        }
+    }
+    
+    func animateTransitionOffsetToRevealArchive(completion: @escaping () -> Void) {
+        let transition = ContainedViewLayoutTransition.animated(duration: 0.2, curve: .spring)
+        transition.animateView(allowUserInteraction: false, delay: 0) {
+            self.transitionOffset = -(self.currentItemHeight ?? 76.0)
+        } completion: { _ in
+            completion()
+        }
+    }
+    
+    func revealScrollHiddenItem(completion: @escaping () -> Void) {
+        guard let node = self.archiveRevealNode else {
+            return
+        }
+        
+        self.avatarContainerNode.isHidden = true
+        node.collapse(to: avatarContainerNode.frame, hasStories: avatarNode.storyStats != nil) { [weak self] in
+            guard let strongSelf = self else {
+                return
+            }
+            strongSelf.avatarContainerNode.isHidden = false
+            
+            // UGLY HACK TO CHANGE ARCHIVE ICON TO NEW ONE
+            // fixed by changing the icon in the assets
+            UIGraphicsBeginImageContextWithOptions(strongSelf.avatarNode.imageNode.frame.size, false, 1.0)
+            strongSelf.archiveRevealNode?.arrowNode.view.drawHierarchy(in: strongSelf.avatarNode.imageNode.frame, afterScreenUpdates: false)
+            let image = UIGraphicsGetImageFromCurrentImageContext()
+            UIGraphicsEndImageContext()
+            strongSelf.avatarNode.imageNode.setSignal(.single(image))
+            
+            strongSelf.archiveRevealNode?.removeFromSupernode()
+            strongSelf.archiveRevealNode = nil
+            completion()
         }
     }
     
@@ -3910,4 +3957,271 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
             }
         }
     }
+    
+    func archiveRevealOffsetChanged(offset: CGFloat, canReveal: Bool) {
+        guard let archiveRevealNode = self.archiveRevealNode else {
+            return
+        }
+        
+        let currentItemHeight = currentItemHeight ?? 0.0
+        archiveRevealNode.asyncLayout(with: CGSize(width: frame.width, height: currentItemHeight),
+                                      avatarRect: avatarContainerNode.frame, scrollOffset: offset, canReveal: canReveal)
+    }
 }
+
+final class ChatListArchiveRevealNode: ASDisplayNode {
+    
+    class GradientNode: ASDisplayNode {
+        
+        private let startUnitPoint: CGPoint
+        private let endUnitPoint: CGPoint
+        private let colors: [UIColor]
+        private let locations: [CGFloat]?
+        
+        override class func draw(_ bounds: CGRect, withParameters parameters: Any?, isCancelled isCancelledBlock: () -> Bool, isRasterizing: Bool) {
+            
+            guard let parameters = parameters as? GradientNode else {
+                return
+            }
+        
+            let startUnitX = parameters.startUnitPoint.x
+            let startUnitY = parameters.startUnitPoint.y
+            let endUnitX = parameters.endUnitPoint.x
+            let endUnitY = parameters.endUnitPoint.y
+            
+            let startPoint = CGPoint(x: bounds.width * startUnitX + bounds.minX, y: bounds.height * startUnitY + bounds.minY)
+            let endPoint = CGPoint(x: bounds.width * endUnitX + bounds.minX, y: bounds.height * endUnitY + bounds.minY)
+            
+            let context = UIGraphicsGetCurrentContext()!
+            context.saveGState()
+            context.clip(to: bounds)
+            
+            guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                            colors: parameters.colors.map { $0.cgColor } as CFArray,
+                                            locations: parameters.locations) else {
+                return
+            }
+            
+            context.drawLinearGradient(gradient,
+                                       start: startPoint,
+                                       end: endPoint,
+                                       options: CGGradientDrawingOptions.drawsAfterEndLocation)
+            context.restoreGState()
+        }
+        
+        init(startingAt startUnitPoint: CGPoint, endingAt endUnitPoint: CGPoint, with colors: [UIColor], for locations: [CGFloat]? = nil) {
+            self.startUnitPoint = startUnitPoint
+            self.endUnitPoint = endUnitPoint
+            self.colors = colors
+            self.locations = locations
+            
+            super.init()
+        }
+        
+        override func drawParameters(forAsyncLayer layer: _ASDisplayLayer) -> NSObjectProtocol? {
+            return self
+        }
+    }
+    
+    let backgroundNode: GradientNode
+    let releaseBackgroundNode: GradientNode
+    let textContainerNode: ASDisplayNode
+    let backgroundTextNode: ASTextNode
+    let releaseTextNode: ASTextNode
+    let arrowNode: AnimationNode
+    let sliderNode: ASDisplayNode
+    
+    private var _canReveal: Bool = false
+    
+    override init() {
+        
+        self.backgroundNode = GradientNode(startingAt: CGPoint(x: 0.0, y: 0.0), endingAt: CGPoint(x: 1.0, y: 0.0),
+                                           with: [UIColor.init(hexString: "B2B7BF")!,
+                                                  UIColor.init(hexString: "DAD9DF")!])
+        self.textContainerNode = ASDisplayNode()
+        self.backgroundTextNode = ASTextNode()
+        self.releaseBackgroundNode = GradientNode(startingAt: CGPoint(x: 0.0, y: 0.0), endingAt: CGPoint(x: 1.0, y: 0.0),
+                                                  with: [UIColor.init(hexString: "0E87F2")!,
+                                                         UIColor.init(hexString: "66BAFC")!])
+        self.releaseTextNode = ASTextNode()
+        
+        self.sliderNode = ASDisplayNode()
+        self.arrowNode = AnimationNode(animation: "archive", scale: 1.0)
+        
+        super.init()
+        
+        self.addSubnode(self.backgroundNode)
+        self.addSubnode(self.releaseBackgroundNode)
+        
+        self.addSubnode(self.textContainerNode)
+        
+        self.textContainerNode.addSubnode(self.backgroundTextNode)
+        self.textContainerNode.addSubnode(self.releaseTextNode)
+        
+        self.addSubnode(self.sliderNode)
+        self.addSubnode(self.arrowNode)
+        
+        self.backgroundNode.isOpaque = false
+        self.releaseBackgroundNode.isOpaque = false
+        self.releaseBackgroundNode.clipsToBounds = true
+        
+        self.backgroundTextNode.attributedText = NSAttributedString(string: "Swipe down for archive", font: Font.bold(16.0), textColor: .white, paragraphAlignment: .center)
+        self.releaseTextNode.attributedText = NSAttributedString(string: "Release for archive", font: Font.bold(16.0), textColor: .white, paragraphAlignment: .center)
+        self.releaseTextNode.alpha = 0
+        
+        self.sliderNode.clipsToBounds = true
+        self.sliderNode.backgroundColor = .white.withAlphaComponent(0.5)
+        
+        let transition = ContainedViewLayoutTransition.immediate
+        self.arrowNode.anchorPoint = .init(x: 0.5, y: 0.58)
+        transition.updateTransformRotation(node: self.arrowNode, angle: .pi)
+    }
+    
+    func asyncLayout(with size: CGSize, avatarRect: CGRect, scrollOffset: CGFloat, canReveal: Bool) {
+        
+        self.arrowNode.setColors(colors: _animationColors(canReveal: canReveal))
+        
+        let immediateTransition = ContainedViewLayoutTransition.immediate
+        
+        let newHeight = size.height + scrollOffset
+        let newFrame = CGRect(origin: CGPoint(x: 0, y: -scrollOffset), size: CGSize(width: size.width, height: newHeight))
+        immediateTransition.updateFrame(node: self, frame: newFrame)
+        
+        let backgroundFrame = CGRect(origin: CGPoint(x: 0, y: size.height), size: CGSize(width: size.width, height: scrollOffset))
+        immediateTransition.updateFrame(node: self.backgroundNode, frame: backgroundFrame)
+        
+        let sliderWidth = avatarRect.width * 0.35
+        let sliderFrame = CGRect(x: avatarRect.origin.x + avatarRect.width/2 - sliderWidth/2, y: size.height + sliderWidth/2, width: sliderWidth, height: scrollOffset - sliderWidth - 4)
+        sliderNode.isHidden = scrollOffset < sliderWidth
+        immediateTransition.updateFrame(node: self.sliderNode, frame: sliderFrame)
+        self.sliderNode.cornerRadius = sliderWidth/2
+        
+        let arrowSide = avatarRect.width
+        let arrowFrame = CGRect(x: avatarRect.origin.x, y: newFrame.height - arrowSide, width: arrowSide, height: arrowSide)
+        immediateTransition.updateFrame(node: self.arrowNode, frame: arrowFrame)
+        
+        let textContainerHeight = arrowSide
+        let textContainerFrame = CGRect(x: arrowFrame.origin.x, y: arrowFrame.origin.y + arrowFrame.height/2 - textContainerHeight/2, width: size.width - arrowFrame.origin.x, height: textContainerHeight)
+        immediateTransition.updateFrame(node: self.textContainerNode, frame: textContainerFrame)
+        
+        if canReveal {
+            let transition = ContainedViewLayoutTransition.animated(duration: 0.3, curve: .spring)
+            
+            let foregroundFrame = _calculateCircleRect(with: CGPoint(x: arrowFrame.center.x, y: arrowFrame.origin.y + arrowFrame.height*arrowNode.anchorPoint.y), fillRect: CGRect(origin: backgroundFrame.origin, size: CGSize(width: backgroundFrame.width, height: backgroundFrame.height)))
+            transition.updateFrame(node: self.releaseBackgroundNode, frame: foregroundFrame)
+            transition.updateCornerRadius(node: self.releaseBackgroundNode, cornerRadius: foregroundFrame.height/2)
+            transition.updateTransformRotation(node: self.arrowNode, angle: 0)
+            
+            let releaseLabelSize = self.releaseTextNode.updateLayout(size)
+            let releaseLabelFrame = CGRect(x: size.width/2 - releaseLabelSize.width/2, y: textContainerFrame.height*arrowNode.anchorPoint.y - releaseLabelSize.height/2, width: releaseLabelSize.width, height: releaseLabelSize.height)
+            transition.updateFrame(node: self.releaseTextNode, frame: releaseLabelFrame)
+            transition.updateAlpha(node: self.releaseTextNode, alpha: 1)
+            
+            let backgroundLabelSize = self.backgroundTextNode.updateLayout(size)
+            let backgroundLabelFrame = CGRect(x: size.width, y: textContainerFrame.height*arrowNode.anchorPoint.y - backgroundLabelSize.height/2, width: backgroundLabelSize.width, height: backgroundLabelSize.height)
+            transition.updateFrame(node: self.backgroundTextNode, frame: backgroundLabelFrame)
+            transition.updateAlpha(node: self.backgroundTextNode, alpha: 0)
+            
+            if self._canReveal == false {
+                let values: [NSNumber] = [0.0, 0.0, 12, 0.0]
+                let keyTimes: [NSNumber] = [0.0, 0.52, 0.65, 1.0]
+                self.releaseTextNode.layer.animateKeyframes(values: values, keyTimes: keyTimes, duration: 0.3, keyPath: "transform.translation.x", timingFunction: CAMediaTimingFunctionName.easeInEaseOut.rawValue)
+            }
+            
+        } else {
+            let transition = ContainedViewLayoutTransition.animated(duration: 0.3, curve: .spring)
+            
+            let side = 4.0
+            let x = self.arrowNode.frame.origin.x + self.arrowNode.frame.width/2 - side/2
+            let y = self.arrowNode.frame.origin.y + self.arrowNode.frame.height * self.arrowNode.anchorPoint.y - side/2
+            let toFrame = CGRect(origin: CGPoint(x: x, y: y), size: CGSize(width: side, height: side))
+            
+            transition.updateFrame(node: self.releaseBackgroundNode, frame: toFrame)
+            transition.updateCornerRadius(node: self.releaseBackgroundNode, cornerRadius: toFrame.height/2)
+            transition.updateTransformRotation(node: self.arrowNode, angle: .pi)
+            
+            let releaseLabelSize = self.releaseTextNode.updateLayout(size)
+            let releaseLabelFrame = CGRect(x: arrowFrame.origin.x, y: textContainerFrame.height*arrowNode.anchorPoint.y - releaseLabelSize.height/2, width: releaseLabelSize.width, height: releaseLabelSize.height)
+            
+            transition.updateFrame(node: self.releaseTextNode, frame: releaseLabelFrame)
+            transition.updateAlpha(node: self.releaseTextNode, alpha: 0)
+            
+            let backgroundLabelSize = self.backgroundTextNode.updateLayout(size)
+            let backgroundLabelFrame = CGRect(x: size.width/2 - backgroundLabelSize.width/2, y: textContainerFrame.height*arrowNode.anchorPoint.y - backgroundLabelSize.height/2, width: backgroundLabelSize.width, height: backgroundLabelSize.height)
+            transition.updateFrame(node: self.backgroundTextNode, frame: backgroundLabelFrame)
+            transition.updateAlpha(node: self.backgroundTextNode, alpha: 1)
+        }
+        
+        self._canReveal = canReveal
+    }
+    
+    private func _animationColors(canReveal: Bool) -> [String: UIColor] {
+        let arrowStrokeColor = canReveal ? UIColor.init(hexString: "0E87F2")! : UIColor.init(hexString: "B2B7BF")!
+        return ["Arrow 1.Arrow 1.Stroke 1" : arrowStrokeColor,
+                "Arrow 2.Arrow 2.Stroke 1" : arrowStrokeColor,
+                "Arrow 2.Arrow 2.Path 1" : UIColor.white,
+                "Cap.cap1.Fill 1" : UIColor.white,
+                "Cap.cap1.Rectangle Path 1" : UIColor.init(hexString: "0E87F2")!,
+                "Cap.cap2.Fill 1" : UIColor.white,
+                "Box.box1.Fill 1" : UIColor.white]
+    }
+    
+    private func _calculateCircleRect(with center: CGPoint, fillRect: CGRect) -> CGRect {
+        let _height = center.y - fillRect.height
+        let _width = center.x - fillRect.width
+        let radius = sqrt(pow(_width, 2) + pow(_height, 2)) + 100 // need dynamic calclulation according to scroll offset
+        return CGRect(x: center.x - radius, y: center.y - radius, width: radius*2, height: radius*2)
+    }
+    
+    func collapse(to rect: CGRect, hasStories: Bool, completion: @escaping () -> Void) {
+        
+        let group = DispatchGroup()
+        
+        group.enter()
+        arrowNode.animate(from: 0, to: 1) {
+            group.leave()
+        }
+        
+        self.backgroundNode.isHidden = true
+        self.arrowNode.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        
+        let sliderTransition = ContainedViewLayoutTransition.animated(duration: 0.2, curve: .spring)
+        
+        let sliderWidth = rect.width * 0.35
+        let sliderFrame = CGRect(x: rect.origin.x + rect.width/2 - sliderWidth/2, y: rect.height/2 - sliderWidth/2, width: sliderWidth, height: sliderWidth)
+        sliderTransition.updateFrame(node: self.sliderNode, frame: sliderFrame)
+        sliderTransition.updateAlpha(node: self.sliderNode, alpha: 0)
+        
+        let transition = ContainedViewLayoutTransition.animated(duration: 0.4, curve: .spring)
+        
+        var scaleFactor = 1.0
+        if hasStories {
+            let activeLineWidth = 2.33
+            scaleFactor = (rect.width - activeLineWidth * 4.0) / rect.width
+        }
+        
+        let newFrame = CGRect(x: (rect.size.width - rect.size.width*scaleFactor)/2.0, y: (rect.size.height - rect.size.height*scaleFactor)/2.0, width: rect.size.width*scaleFactor, height: rect.size.height*scaleFactor)
+        
+        transition.updateFrame(node: self, frame: rect)
+        transition.updateFrame(node: self.releaseBackgroundNode, frame: newFrame)
+        transition.updateFrame(node: self.arrowNode, frame: newFrame)
+        transition.updateAlpha(node: self.textContainerNode, alpha: 0)
+        
+        let values: [NSNumber] = [1.0, 1.0, 0.8, 0.8, 1.0]
+        let keyTimes: [NSNumber] = [0.0, 0.6, 0.7, 0.8, 1.0]
+        self.releaseBackgroundNode.layer.animateKeyframes(values: values, keyTimes: keyTimes, duration: 0.4, keyPath: "transform.scale", timingFunction: CAMediaTimingFunctionName.easeInEaseOut.rawValue)
+        
+        let immediateTransition = ContainedViewLayoutTransition.immediate
+        immediateTransition.updateTransformRotation(node: self.arrowNode, angle: 0)
+        
+        group.enter()
+        transition.updateCornerRadius(node: self.releaseBackgroundNode, cornerRadius: newFrame.height/2) { _ in
+            group.leave()
+        }
+        
+        group.notify(queue: .main) {
+            completion()
+        }
+    }
+}
+
