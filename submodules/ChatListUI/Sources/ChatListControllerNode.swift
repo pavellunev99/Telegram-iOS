@@ -2440,24 +2440,24 @@ final class ChatListControllerNode: ASDisplayNode, UIGestureRecognizerDelegate {
             }
             
             if let controller = self.controller {
-                if let peerId = overscrollSelectedId {
-                    if self.allowOverscrollStoryExpansion && self.inlineStackContainerNode == nil && isPrimary {
-                        let timestamp = CACurrentMediaTime()
-                        if let _ = self.currentOverscrollStoryExpansionTimestamp {
-                        } else {
-                            self.currentOverscrollStoryExpansionTimestamp = timestamp
-                        }
-                        
-                        if let currentOverscrollStoryExpansionTimestamp = self.currentOverscrollStoryExpansionTimestamp, currentOverscrollStoryExpansionTimestamp <= timestamp - 0.0 {
-                            self.allowOverscrollStoryExpansion = false
-                            self.currentOverscrollStoryExpansionTimestamp = nil
-                            self.allowOverscrollItemExpansion = false
-                            self.currentOverscrollItemExpansionTimestamp = nil
-                            HapticFeedback().tap()
-                            
-                            controller.openStories(peerId: peerId)
-                        }
-                    }
+                if let _ = overscrollSelectedId {
+//                    if self.allowOverscrollStoryExpansion && self.inlineStackContainerNode == nil && isPrimary {
+//                        let timestamp = CACurrentMediaTime()
+//                        if let _ = self.currentOverscrollStoryExpansionTimestamp {
+//                        } else {
+//                            self.currentOverscrollStoryExpansionTimestamp = timestamp
+//                        }
+//
+//                        if let currentOverscrollStoryExpansionTimestamp = self.currentOverscrollStoryExpansionTimestamp, currentOverscrollStoryExpansionTimestamp <= timestamp - 0.0 {
+//                            self.allowOverscrollStoryExpansion = false
+//                            self.currentOverscrollStoryExpansionTimestamp = nil
+//                            self.allowOverscrollItemExpansion = false
+//                            self.currentOverscrollItemExpansionTimestamp = nil
+//                            HapticFeedback().tap()
+//
+//                            controller.openStories(peerId: peerId)
+//                        }
+//                    }
                 } else {
                     if !overscrollHiddenChatItemsAllowed {
                         var manuallyAllow = false

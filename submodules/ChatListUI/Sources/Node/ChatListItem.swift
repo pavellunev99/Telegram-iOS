@@ -2727,6 +2727,8 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
                     
                     if item.hiddenOffset {
                         strongSelf.layer.zPosition = -1.0
+                    } else {
+                        strongSelf.layer.zPosition = 1.0
                     }
                                        
                     if case .groupReference = item.content {
@@ -3976,7 +3978,7 @@ final class ChatListArchiveRevealNode: ASDisplayNode {
         private let startUnitPoint: CGPoint
         private let endUnitPoint: CGPoint
         private let colors: [UIColor]
-        private let locations: [CGFloat]?
+        private var locations: [CGFloat]?
         
         override class func draw(_ bounds: CGRect, withParameters parameters: Any?, isCancelled isCancelledBlock: () -> Bool, isRasterizing: Bool) {
             
@@ -4021,6 +4023,14 @@ final class ChatListArchiveRevealNode: ASDisplayNode {
         override func drawParameters(forAsyncLayer layer: _ASDisplayLayer) -> NSObjectProtocol? {
             return self
         }
+        
+        func resetLocations() {
+            self.locations = [0.0, 1.0]
+            let transition = ContainedViewLayoutTransition.animated(duration: 0.05, curve: .linear)
+            transition.animateView(delay: 0.35) {
+                self.setNeedsDisplay()
+            }
+        }
     }
     
     let backgroundNode: GradientNode
@@ -4042,7 +4052,8 @@ final class ChatListArchiveRevealNode: ASDisplayNode {
         self.backgroundTextNode = ASTextNode()
         self.releaseBackgroundNode = GradientNode(startingAt: CGPoint(x: 0.0, y: 0.0), endingAt: CGPoint(x: 1.0, y: 0.0),
                                                   with: [UIColor.init(hexString: "0E87F2")!,
-                                                         UIColor.init(hexString: "66BAFC")!])
+                                                         UIColor.init(hexString: "66BAFC")!],
+                                                  for: [0.4, 1.0])
         self.releaseTextNode = ASTextNode()
         
         self.sliderNode = ASDisplayNode()
@@ -4073,7 +4084,7 @@ final class ChatListArchiveRevealNode: ASDisplayNode {
         self.sliderNode.backgroundColor = .white.withAlphaComponent(0.5)
         
         let transition = ContainedViewLayoutTransition.immediate
-        self.arrowNode.anchorPoint = .init(x: 0.5, y: 0.58)
+        self.arrowNode.anchorPoint = .init(x: 0.5, y: 0.569)
         transition.updateTransformRotation(node: self.arrowNode, angle: .pi)
     }
     
@@ -4092,7 +4103,7 @@ final class ChatListArchiveRevealNode: ASDisplayNode {
         
         let sliderWidth = avatarRect.width * 0.35
         let sliderFrame = CGRect(x: avatarRect.origin.x + avatarRect.width/2 - sliderWidth/2, y: size.height + sliderWidth/2, width: sliderWidth, height: scrollOffset - sliderWidth - 4)
-        sliderNode.isHidden = scrollOffset < sliderWidth
+        sliderNode.isHidden = scrollOffset < sliderWidth*2
         immediateTransition.updateFrame(node: self.sliderNode, frame: sliderFrame)
         self.sliderNode.cornerRadius = sliderWidth/2
         
@@ -4123,8 +4134,8 @@ final class ChatListArchiveRevealNode: ASDisplayNode {
             transition.updateAlpha(node: self.backgroundTextNode, alpha: 0)
             
             if self._canReveal == false {
-                let values: [NSNumber] = [0.0, 0.0, 12, 0.0]
-                let keyTimes: [NSNumber] = [0.0, 0.52, 0.65, 1.0]
+                let values: [NSNumber] = [0.0, 0.0, 16, 0.0]
+                let keyTimes: [NSNumber] = [0.0, 0.48, 0.6, 1.0]
                 self.releaseTextNode.layer.animateKeyframes(values: values, keyTimes: keyTimes, duration: 0.3, keyPath: "transform.translation.x", timingFunction: CAMediaTimingFunctionName.easeInEaseOut.rawValue)
             }
             
@@ -4185,13 +4196,6 @@ final class ChatListArchiveRevealNode: ASDisplayNode {
         self.backgroundNode.isHidden = true
         self.arrowNode.anchorPoint = CGPoint(x: 0.5, y: 0.5)
         
-        let sliderTransition = ContainedViewLayoutTransition.animated(duration: 0.2, curve: .spring)
-        
-        let sliderWidth = rect.width * 0.35
-        let sliderFrame = CGRect(x: rect.origin.x + rect.width/2 - sliderWidth/2, y: rect.height/2 - sliderWidth/2, width: sliderWidth, height: sliderWidth)
-        sliderTransition.updateFrame(node: self.sliderNode, frame: sliderFrame)
-        sliderTransition.updateAlpha(node: self.sliderNode, alpha: 0)
-        
         let transition = ContainedViewLayoutTransition.animated(duration: 0.4, curve: .spring)
         
         var scaleFactor = 1.0
@@ -4207,12 +4211,21 @@ final class ChatListArchiveRevealNode: ASDisplayNode {
         transition.updateFrame(node: self.arrowNode, frame: newFrame)
         transition.updateAlpha(node: self.textContainerNode, alpha: 0)
         
-        let values: [NSNumber] = [1.0, 1.0, 0.8, 0.8, 1.0]
-        let keyTimes: [NSNumber] = [0.0, 0.6, 0.7, 0.8, 1.0]
+        let values: [NSNumber] = [1.0, 1.0, 0.75, 0.75, 1.0]
+        let keyTimes: [NSNumber] = [0.0, 0.75, 0.85, 0.9, 1.0]
         self.releaseBackgroundNode.layer.animateKeyframes(values: values, keyTimes: keyTimes, duration: 0.4, keyPath: "transform.scale", timingFunction: CAMediaTimingFunctionName.easeInEaseOut.rawValue)
+        
+        let sliderTransition = ContainedViewLayoutTransition.animated(duration: 0.16, curve: .linear)
+        
+        let sliderWidth = rect.width * 0.35
+        let sliderFrame = CGRect(x: newFrame.center.x - sliderWidth/2, y: newFrame.center.y - sliderWidth/3, width: sliderWidth, height: sliderWidth/2)
+        sliderTransition.updateFrame(node: self.sliderNode, frame: sliderFrame)
+        sliderTransition.updateAlpha(node: self.sliderNode, alpha: 0)
         
         let immediateTransition = ContainedViewLayoutTransition.immediate
         immediateTransition.updateTransformRotation(node: self.arrowNode, angle: 0)
+        
+        self.releaseBackgroundNode.resetLocations()
         
         group.enter()
         transition.updateCornerRadius(node: self.releaseBackgroundNode, cornerRadius: newFrame.height/2) { _ in

@@ -2860,7 +2860,7 @@ public final class ChatListNode: ListView {
             
             if strongSelf.startedScrollingAtUpperBound, startedScrollingWithCanExpandHiddenItems {
                 if case let .known(value) = strongSelf.visibleContentOffset() {
-                    strongSelf.expandHiddenItemOffsetChanged(offset: value)
+                    strongSelf.expandHiddenItemOffsetChanged(offset: value + strongSelf.tempTopInset)
                 }
             }
         }
@@ -2945,11 +2945,6 @@ public final class ChatListNode: ListView {
         })
         
         group.notify(queue: .main) {
-//            self.forEachItemNode({ itemNode in
-//                if let itemNode = itemNode as? ChatListItemNode {
-//                    itemNode.transitionOffset = 0
-//                }
-//            })
             self.revealScrollHiddenItem()
         }
     }

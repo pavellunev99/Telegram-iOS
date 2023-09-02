@@ -447,7 +447,7 @@ public final class StoryPeerListComponent: Component {
                 
                 for (peerId, visibleItem) in self.visibleItems {
                     if let itemView = visibleItem.view.view as? StoryPeerListItemComponent.View {
-                        itemView.updateIsPreviewing(isPreviewing: peerId == itemId)
+                        //itemView.updateIsPreviewing(isPreviewing: peerId == itemId)
                         
                         if component.unlocked && peerId == itemId {
                             let itemFrame = itemView.frame.offsetBy(dx: self.scrollView.bounds.minX, dy: 0.0)
@@ -820,17 +820,17 @@ public final class StoryPeerListComponent: Component {
             //let realTimeOverscrollFraction: CGFloat = max(0.0, (1.0 - component.collapseFraction) - 1.0)
             let realTimeOverscrollFraction = totalOverscrollFraction
             
-            var overscrollFocusIndex: Int?
-            for i in 0 ..< self.sortedItems.count {
-                if self.sortedItems[i].peer.id == component.context.account.peerId {
-                    continue
-                }
-                let itemFrame = itemLayout.frame(at: i)
-                if effectiveVisibleBounds.contains(itemFrame) {
-                    overscrollFocusIndex = i
-                    break
-                }
-            }
+            let overscrollFocusIndex: Int? = nil
+//            for i in 0 ..< self.sortedItems.count {
+//                if self.sortedItems[i].peer.id == component.context.account.peerId {
+//                    continue
+//                }
+//                let itemFrame = itemLayout.frame(at: i)
+//                if effectiveVisibleBounds.contains(itemFrame) {
+//                    overscrollFocusIndex = i
+//                    break
+//                }
+//            }
             
             if overscrollStage1 >= 0.5 {
                 self.overscrollHiddenChatItemsAllowed = true
@@ -1086,7 +1086,7 @@ public final class StoryPeerListComponent: Component {
                     itemTransition.setAlpha(view: itemView.backgroundContainer, alpha: itemAlpha)
                     itemTransition.setScale(view: itemView.backgroundContainer, scale: 1.0)
                     
-                    itemView.updateIsPreviewing(isPreviewing: self.previewedItemId == itemSet.peer.id)
+                    //itemView.updateIsPreviewing(isPreviewing: self.previewedItemId == itemSet.peer.id)
                     
                     if (i >= collapseStartIndex && i <= collapseEndIndex) || !isReallyVisible {
                         itemView.layer.filters = nil
