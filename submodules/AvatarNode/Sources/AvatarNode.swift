@@ -34,7 +34,6 @@ private class AvatarNodeParameters: NSObject {
     let accountPeerId: EnginePeer.Id?
     let peerId: EnginePeer.Id?
     let colors: [UIColor]
-    let gradientDimension: CGPoint
     let letters: [String]
     let font: UIFont
     let icon: AvatarNodeIcon
@@ -42,12 +41,11 @@ private class AvatarNodeParameters: NSObject {
     let hasImage: Bool
     let clipStyle: AvatarNodeClipStyle
     
-    init(theme: PresentationTheme?, accountPeerId: EnginePeer.Id?, peerId: EnginePeer.Id?, colors: [UIColor], gradientDimension: CGPoint, letters: [String], font: UIFont, icon: AvatarNodeIcon, explicitColorIndex: Int?, hasImage: Bool, clipStyle: AvatarNodeClipStyle) {
+    init(theme: PresentationTheme?, accountPeerId: EnginePeer.Id?, peerId: EnginePeer.Id?, colors: [UIColor], letters: [String], font: UIFont, icon: AvatarNodeIcon, explicitColorIndex: Int?, hasImage: Bool, clipStyle: AvatarNodeClipStyle) {
         self.theme = theme
         self.accountPeerId = accountPeerId
         self.peerId = peerId
         self.colors = colors
-        self.gradientDimension = gradientDimension
         self.letters = letters
         self.font = font
         self.icon = icon
@@ -59,7 +57,7 @@ private class AvatarNodeParameters: NSObject {
     }
     
     func withUpdatedHasImage(_ hasImage: Bool) -> AvatarNodeParameters {
-        return AvatarNodeParameters(theme: self.theme, accountPeerId: self.accountPeerId, peerId: self.peerId, colors: self.colors, gradientDimension: self.gradientDimension, letters: self.letters, font: self.font, icon: self.icon, explicitColorIndex: self.explicitColorIndex, hasImage: hasImage, clipStyle: self.clipStyle)
+        return AvatarNodeParameters(theme: self.theme, accountPeerId: self.accountPeerId, peerId: self.peerId, colors: self.colors, letters: self.letters, font: self.font, icon: self.icon, explicitColorIndex: self.explicitColorIndex, hasImage: hasImage, clipStyle: self.clipStyle)
     }
 }
 
@@ -227,7 +225,7 @@ public final class AvatarNode: ASDisplayNode {
             didSet {
                 if oldValue.pointSize != font.pointSize {
                     if let parameters = self.parameters {
-                        self.parameters = AvatarNodeParameters(theme: parameters.theme, accountPeerId: parameters.accountPeerId, peerId: parameters.peerId, colors: parameters.colors, gradientDimension: parameters.gradientDimension, letters: parameters.letters, font: self.font, icon: parameters.icon, explicitColorIndex: parameters.explicitColorIndex, hasImage: parameters.hasImage, clipStyle: parameters.clipStyle)
+                        self.parameters = AvatarNodeParameters(theme: parameters.theme, accountPeerId: parameters.accountPeerId, peerId: parameters.peerId, colors: parameters.colors, letters: parameters.letters, font: self.font, icon: parameters.icon, explicitColorIndex: parameters.explicitColorIndex, hasImage: parameters.hasImage, clipStyle: parameters.clipStyle)
                     }
                     
                     if !self.displaySuspended {
@@ -393,7 +391,6 @@ public final class AvatarNode: ASDisplayNode {
             var synchronousLoad = synchronousLoad
             var representation: TelegramMediaImageRepresentation?
             var icon = AvatarNodeIcon.none
-            var gradientDimension = CGPoint(x: 0, y: 1)
             if let overrideImage = overrideImage {
                 switch overrideImage {
                     case .none:
@@ -410,7 +407,6 @@ public final class AvatarNode: ASDisplayNode {
                     case let .archivedChatsIcon(hiddenByDefault):
                         representation = nil
                         icon = .archivedChatsIcon(hiddenByDefault: hiddenByDefault)
-                        gradientDimension = CGPoint(x: 1, y: 0)
                     case let .editAvatarIcon(forceNone):
                         representation = forceNone ? nil : peer?.smallProfileImage
                         icon = .editAvatarIcon
@@ -461,7 +457,7 @@ public final class AvatarNode: ASDisplayNode {
                         self.editOverlayNode?.isHidden = true
                     }
                     
-                    parameters = AvatarNodeParameters(theme: theme, accountPeerId: account.peerId, peerId: peer.id, colors: calculateColors(explicitColorIndex: nil, peerId: peer.id, icon: icon, theme: theme), gradientDimension: gradientDimension, letters: peer.displayLetters, font: self.font, icon: icon, explicitColorIndex: nil, hasImage: true, clipStyle: clipStyle)
+                    parameters = AvatarNodeParameters(theme: theme, accountPeerId: account.peerId, peerId: peer.id, colors: calculateColors(explicitColorIndex: nil, peerId: peer.id, icon: icon, theme: theme), letters: peer.displayLetters, font: self.font, icon: icon, explicitColorIndex: nil, hasImage: true, clipStyle: clipStyle)
                 } else {
                     self.imageReady.set(.single(true))
                     self.displaySuspended = false
@@ -471,7 +467,7 @@ public final class AvatarNode: ASDisplayNode {
                     
                     self.editOverlayNode?.isHidden = true
                     let colors = calculateColors(explicitColorIndex: nil, peerId: peer?.id ?? EnginePeer.Id(0), icon: icon, theme: theme)
-                    parameters = AvatarNodeParameters(theme: theme, accountPeerId: account.peerId, peerId: peer?.id ?? EnginePeer.Id(0), colors: colors, gradientDimension: gradientDimension, letters: peer?.displayLetters ?? [], font: self.font, icon: icon, explicitColorIndex: nil, hasImage: false, clipStyle: clipStyle)
+                    parameters = AvatarNodeParameters(theme: theme, accountPeerId: account.peerId, peerId: peer?.id ?? EnginePeer.Id(0), colors: colors, letters: peer?.displayLetters ?? [], font: self.font, icon: icon, explicitColorIndex: nil, hasImage: false, clipStyle: clipStyle)
                     
                     if let badgeView = self.badgeView {
                         let badgeColor: UIColor
@@ -507,9 +503,9 @@ public final class AvatarNode: ASDisplayNode {
                 
                 let parameters: AvatarNodeParameters
                 if let icon = icon, case .phone = icon {
-                    parameters = AvatarNodeParameters(theme: nil, accountPeerId: nil, peerId: nil, colors: calculateColors(explicitColorIndex: explicitIndex, peerId: nil, icon: .phoneIcon, theme: nil), gradientDimension: .zero, letters: [], font: self.font, icon: .phoneIcon, explicitColorIndex: explicitIndex, hasImage: false, clipStyle: .round)
+                    parameters = AvatarNodeParameters(theme: nil, accountPeerId: nil, peerId: nil, colors: calculateColors(explicitColorIndex: explicitIndex, peerId: nil, icon: .phoneIcon, theme: nil), letters: [], font: self.font, icon: .phoneIcon, explicitColorIndex: explicitIndex, hasImage: false, clipStyle: .round)
                 } else {
-                    parameters = AvatarNodeParameters(theme: nil, accountPeerId: nil, peerId: nil, colors: calculateColors(explicitColorIndex: explicitIndex, peerId: nil, icon: .none, theme: nil), gradientDimension: .zero, letters: letters, font: self.font, icon: .none, explicitColorIndex: explicitIndex, hasImage: false, clipStyle: .round)
+                    parameters = AvatarNodeParameters(theme: nil, accountPeerId: nil, peerId: nil, colors: calculateColors(explicitColorIndex: explicitIndex, peerId: nil, icon: .none, theme: nil), letters: letters, font: self.font, icon: .none, explicitColorIndex: explicitIndex, hasImage: false, clipStyle: .round)
                 }
                 
                 self.displaySuspended = true
@@ -576,14 +572,7 @@ public final class AvatarNode: ASDisplayNode {
             let colorSpace = CGColorSpaceCreateDeviceRGB()
             let gradient = CGGradient(colorsSpace: colorSpace, colors: colorsArray, locations: &locations)!
             
-            
-            var endPoint = CGPoint(x: 0.0, y: bounds.size.height)
-            
-            if let parameters = parameters as? AvatarNodeParameters {
-                endPoint = CGPoint(x: bounds.width * parameters.gradientDimension.x, y: bounds.height * parameters.gradientDimension.y)
-            }
-            
-            context.drawLinearGradient(gradient, start: CGPoint(), end: endPoint, options: CGGradientDrawingOptions())
+            context.drawLinearGradient(gradient, start: CGPoint(), end: CGPoint(x: 0.0, y: bounds.size.height), options: CGGradientDrawingOptions())
             
             context.setBlendMode(.normal)
             

@@ -3632,15 +3632,21 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
     }
     
     func revealScrollHiddenItem(completion: @escaping () -> Void) {
-        guard let node = self.archiveRevealNode else {
+        guard let node = self.archiveRevealNode, let item = item else {
             return
         }
         
+        let storyStats = self.avatarNode.storyStats
+        let storyPresentationParams = AvatarNode.StoryPresentationParams(colors: AvatarNode.Colors(theme: item.presentationData.theme), lineWidth: 2.33, inactiveLineWidth: 1.33)
+        
         self.avatarContainerNode.isHidden = true
+        self.avatarNode.setStoryStats(storyStats: nil, presentationParams: storyPresentationParams, transition: .immediate)
+        
         node.collapse(to: avatarContainerNode.frame, hasStories: avatarNode.storyStats != nil) { [weak self] in
             guard let strongSelf = self else {
                 return
             }
+            
             strongSelf.avatarContainerNode.isHidden = false
             
             // UGLY HACK TO CHANGE ARCHIVE ICON TO NEW ONE
@@ -3653,7 +3659,19 @@ class ChatListItemNode: ItemListRevealOptionsItemNode {
             
             strongSelf.archiveRevealNode?.removeFromSupernode()
             strongSelf.archiveRevealNode = nil
-            completion()
+            
+            let timeOffset: TimeInterval
+            
+            if storyStats != nil {
+                strongSelf.avatarNode.setStoryStats(storyStats: storyStats, presentationParams: storyPresentationParams, transition: .spring(duration: 0.3))
+                timeOffset = 0.3
+            } else {
+                timeOffset = 0
+            }
+            
+            Queue.mainQueue().after(timeOffset) {
+                completion()
+            }
         }
     }
     
@@ -3975,10 +3993,10 @@ final class ChatListArchiveRevealNode: ASDisplayNode {
     
     class GradientNode: ASDisplayNode {
         
-        private let startUnitPoint: CGPoint
-        private let endUnitPoint: CGPoint
-        private let colors: [UIColor]
-        private var locations: [CGFloat]?
+        var startUnitPoint: CGPoint
+        var endUnitPoint: CGPoint
+        var colors: [UIColor]
+        var locations: [CGFloat]?
         
         override class func draw(_ bounds: CGRect, withParameters parameters: Any?, isCancelled isCancelledBlock: () -> Bool, isRasterizing: Bool) {
             
@@ -4022,14 +4040,6 @@ final class ChatListArchiveRevealNode: ASDisplayNode {
         
         override func drawParameters(forAsyncLayer layer: _ASDisplayLayer) -> NSObjectProtocol? {
             return self
-        }
-        
-        func resetLocations() {
-            self.locations = [0.0, 1.0]
-            let transition = ContainedViewLayoutTransition.animated(duration: 0.05, curve: .linear)
-            transition.animateView(delay: 0.35) {
-                self.setNeedsDisplay()
-            }
         }
     }
     
@@ -4225,7 +4235,13 @@ final class ChatListArchiveRevealNode: ASDisplayNode {
         let immediateTransition = ContainedViewLayoutTransition.immediate
         immediateTransition.updateTransformRotation(node: self.arrowNode, angle: 0)
         
-        self.releaseBackgroundNode.resetLocations()
+        self.releaseBackgroundNode.locations = [0.0, 1.0]
+        self.releaseBackgroundNode.startUnitPoint = CGPoint(x: 0.0, y: 0.0)
+        self.releaseBackgroundNode.endUnitPoint = CGPoint(x: 0.0, y: 1.0)
+        
+        transition.animateView(delay: 0.35) {
+            self.releaseBackgroundNode.setNeedsDisplay()
+        }
         
         group.enter()
         transition.updateCornerRadius(node: self.releaseBackgroundNode, cornerRadius: newFrame.height/2) { _ in
