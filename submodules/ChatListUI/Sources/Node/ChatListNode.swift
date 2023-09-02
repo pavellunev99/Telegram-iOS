@@ -2923,6 +2923,8 @@ public final class ChatListNode: ListView {
         
         let group = DispatchGroup()
         
+        self.hapticFeedback?.impact(.medium)
+        
         self.reveailing = true
         self.forEachItemNode({ itemNode in
             if let itemNode = itemNode as? ChatListItemNode, let item = itemNode.item {
@@ -2996,7 +2998,6 @@ public final class ChatListNode: ListView {
             if self.hapticFeedback == nil {
                 self.hapticFeedback = HapticFeedback()
             }
-            self.hapticFeedback?.impact(.medium)
             self.updateState { state in
                 var state = state
                 state.hiddenItemShouldBeTemporaryRevealed = true
