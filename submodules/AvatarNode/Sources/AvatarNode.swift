@@ -334,28 +334,14 @@ public final class AvatarNode: ASDisplayNode {
                 return
             }
             
-            var iconColor = theme.chatList.unpinnedArchiveAvatarColor.foregroundColor
-            var backgroundColor = theme.chatList.unpinnedArchiveAvatarColor.backgroundColors.topColor
+            let iconColor = theme.chatList.unpinnedArchiveAvatarColor.foregroundColor
             let animationBackgroundNode = ASImageNode()
             animationBackgroundNode.isUserInteractionEnabled = false
             animationBackgroundNode.frame = self.imageNode.frame
-            if let overrideImage = self.overrideImage, case let .archivedChatsIcon(hiddenByDefault) = overrideImage {
-                let backgroundColors: (UIColor, UIColor)
-                if hiddenByDefault {
-                    backgroundColors = theme.chatList.unpinnedArchiveAvatarColor.backgroundColors.colors
-                    iconColor = theme.chatList.unpinnedArchiveAvatarColor.foregroundColor
-                } else {
-                    backgroundColors = theme.chatList.pinnedArchiveAvatarColor.backgroundColors.colors
-                    iconColor = theme.chatList.pinnedArchiveAvatarColor.foregroundColor
-                }
-                let colors: NSArray = [backgroundColors.1.cgColor, backgroundColors.0.cgColor]
-                backgroundColor = backgroundColors.1.mixedWith(backgroundColors.0, alpha: 0.5)
-                animationBackgroundNode.image = generateGradientFilledCircleImage(diameter: self.imageNode.frame.width, colors: colors)
-            }
             
             self.addSubnode(animationBackgroundNode)
             
-            let animationNode = AnimationNode(animation: "anim_archiveAvatar", colors: ["box1.box1.Fill 1": iconColor, "box3.box3.Fill 1": iconColor, "box2.box2.Fill 1": backgroundColor], scale: 0.1653828)
+            let animationNode = AnimationNode(animation: "anim_archiveAvatar", colors: ["box1.box1.Fill 1": iconColor, "box3.box3.Fill 1": iconColor, "box2.box2.Fill 1": UIColor.init(hexString: "0E87F2")!], scale: 0.1653828)
             animationNode.isUserInteractionEnabled = false
             animationNode.completion = { [weak animationBackgroundNode, weak self] in
                 self?.imageNode.isHidden = false
